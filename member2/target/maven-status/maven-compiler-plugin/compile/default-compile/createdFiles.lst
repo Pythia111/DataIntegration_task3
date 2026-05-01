@@ -1,0 +1,16 @@
+com\collegeA\net\IntegrationClient.class
+com\collegeA\dao\CourseDAO.class
+com\collegeA\Main.class
+com\collegeA\net\LocalHttpServer.class
+com\collegeA\util\XMLHandler.class
+com\collegeA\Main$1.class
+com\collegeA\entity\Course.class
+com\collegeA\gui\LoginFrame$1.class
+com\collegeA\dao\ChoiceDAO.class
+com\collegeA\gui\StudentFrame.class
+com\collegeA\util\DatabaseConnection.class
+com\collegeA\xml\XMLBuilder.class
+com\collegeA\entity\CourseChoice.class
+com\collegeA\gui\LoginFrame.class
+com\collegeA\net\LocalHttpServer$1.class
+com\collegeA\gui\AdminFrame.class
