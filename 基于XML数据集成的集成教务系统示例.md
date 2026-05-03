@@ -408,6 +408,7 @@ XMLWriter xw = new XMLWriter(w, opf);
 xw.write(doc);
 xw.close();
 w.close();
+```
 
 2. XML验证
 利用本地的XSD文件对发送过来的XML文件进行验证，sax部分使用xercesImpl.jar包。部分示例代码如下：
