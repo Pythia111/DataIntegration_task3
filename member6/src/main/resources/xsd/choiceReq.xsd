@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified">
+  <xs:element name="choiceReq">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="traceId" type="xs:string"/>
+        <xs:element name="source" minOccurs="0">
+          <xs:simpleType>
+            <xs:restriction base="xs:string">
+              <xs:enumeration value="A"/>
+              <xs:enumeration value="B"/>
+              <xs:enumeration value="C"/>
+            </xs:restriction>
+          </xs:simpleType>
+        </xs:element>
+        <xs:element name="sid" type="xs:string"/>
+        <xs:element name="cid" type="xs:string"/>
+        <xs:element name="operation">
+          <xs:simpleType>
+            <xs:restriction base="xs:string">
+              <xs:enumeration value="ENROLL"/>
+              <xs:enumeration value="DROP"/>
+            </xs:restriction>
+          </xs:simpleType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>
