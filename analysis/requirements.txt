@@ -1,0 +1,24 @@
+# 作业四数据分析所需依赖包
+# 安装方式：pip install -r requirements.txt
+
+# 数据库连接
+pymysql==1.1.0
+SQLAlchemy==2.0.30
+
+# 数据处理与分析
+pandas==2.2.2
+numpy==1.26.4
+
+# 数据可视化
+matplotlib==3.8.4
+seaborn==0.13.2
+
+# 数据探查
+pandas-profiling==3.6.6
+
+# 机器学习与相似度计算
+scikit-learn==1.4.2
+
+# Jupyter支持（可选）
+jupyter==1.0.0
+ipython==8.24.0
