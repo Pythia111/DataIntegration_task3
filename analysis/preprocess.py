@@ -23,6 +23,16 @@ class DataPreprocessor:
         self.courses_df = None
         self.sc_df = None
 
+    @staticmethod
+    def _normalize_group_no(series):
+        """将组号统一转换为整数，无法转换的保留为空值。"""
+        return pd.to_numeric(series.astype(str).str.strip(), errors='coerce').astype('Int64')
+
+    @staticmethod
+    def _normalize_dept_no(series):
+        """统一院系编号格式。"""
+        return series.astype(str).str.strip().str.upper()
+
     def load_data(self):
         """
         加载CSV数据文件
@@ -163,9 +173,31 @@ class DataPreprocessor:
             print(f"  - 性别字段已统一格式")
 
         # 4. 组号和院系编号处理
-        for col in ['group_no', 'dept_no']:
-            if col in df.columns:
-                df[col] = df[col].astype(str).str.strip()
+        if 'group_no' in df.columns:
+            df['group_no'] = self._normalize_group_no(df['group_no'])
+        if 'dept_no' in df.columns:
+            df['dept_no'] = self._normalize_dept_no(df['dept_no'])
+
+        # 5. 删除明显错误的组号重复记录：当同一学生在其他表或同表中已有有效组号时，剔除异常组号行
+        if 'group_no' in df.columns:
+            valid_group_nos = set()
+            for related_df in [self.courses_df, self.sc_df]:
+                if related_df is not None and 'group_no' in related_df.columns:
+                    normalized_groups = self._normalize_group_no(related_df['group_no']).dropna().astype(int)
+                    valid_group_nos.update(normalized_groups.tolist())
+
+            if valid_group_nos:
+                duplicate_keys = ['student_id', 'student_name', 'dept_no', 'account']
+                duplicate_mask = df.duplicated(subset=duplicate_keys, keep=False)
+                invalid_group_mask = df['group_no'].notna() & ~df['group_no'].isin(valid_group_nos)
+                drop_mask = duplicate_mask & invalid_group_mask
+                dropped_invalid_groups = int(drop_mask.sum())
+                if dropped_invalid_groups > 0:
+                    df = df.loc[~drop_mask].copy()
+                    print(f"  - 删除组号异常的重复学生记录: {dropped_invalid_groups}条")
+
+            df = df.dropna(subset=['group_no'])
+            df['group_no'] = df['group_no'].astype('int64')
 
         self.students_df = df
         print(f"✓ 学生表清洗完成，当前记录数: {len(df)}")
@@ -198,10 +230,11 @@ class DataPreprocessor:
             df['credit'] = pd.to_numeric(df['credit'], errors='coerce')
             print(f"  - 学分字段已转换为数值类型")
 
-        # 4. 课时字段转换为数值类型
+        # 4. 课时字段转换为数值类型，缺失值填充0
         for col in ['class_hours', 'practice_hours']:
             if col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors='coerce')
+                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+        print(f"  - 课时字段已转换为数值类型（缺失值填充为0）")
 
         # 5. 共享标志统一格式（Y/N）
         if 'share_flag' in df.columns:
@@ -210,12 +243,21 @@ class DataPreprocessor:
                 'N': 'N', 'n': 'N', '0': 'N', 'No': 'N', 'no': 'N', '否': 'N'
             }
             df['share_flag'] = df['share_flag'].map(share_mapping).fillna(df['share_flag'])
+
+            # 某些组将 share_flag 直接写成所属院系编号（A/B/C），这类课程应视为非共享课程
+            if 'dept_no' in df.columns:
+                dept_values = self._normalize_dept_no(df['dept_no'])
+                df['share_flag'] = df['share_flag'].astype(str).str.strip().str.upper()
+                df.loc[df['share_flag'] == dept_values, 'share_flag'] = 'N'
             print(f"  - 共享标志已统一格式")
 
         # 6. 组号和院系编号处理
-        for col in ['group_no', 'dept_no']:
-            if col in df.columns:
-                df[col] = df[col].astype(str).str.strip()
+        if 'group_no' in df.columns:
+            df['group_no'] = self._normalize_group_no(df['group_no'])
+            df = df.dropna(subset=['group_no'])
+            df['group_no'] = df['group_no'].astype('int64')
+        if 'dept_no' in df.columns:
+            df['dept_no'] = self._normalize_dept_no(df['dept_no'])
 
         self.courses_df = df
         print(f"✓ 课程表清洗完成，当前记录数: {len(df)}")
@@ -250,9 +292,12 @@ class DataPreprocessor:
             print(f"  - 成绩字段已转换为数值类型（NULL数: {null_score_count}）")
 
         # 4. 组号和院系编号处理
-        for col in ['group_no', 'dept_no']:
-            if col in df.columns:
-                df[col] = df[col].astype(str).str.strip()
+        if 'group_no' in df.columns:
+            df['group_no'] = self._normalize_group_no(df['group_no'])
+            df = df.dropna(subset=['group_no'])
+            df['group_no'] = df['group_no'].astype('int64')
+        if 'dept_no' in df.columns:
+            df['dept_no'] = self._normalize_dept_no(df['dept_no'])
 
         # 5. 删除重复选课记录
         before_dedup = len(df)
@@ -260,6 +305,23 @@ class DataPreprocessor:
         after_dedup = len(df)
         if before_dedup > after_dedup:
             print(f"  - 删除重复选课记录: {before_dedup - after_dedup}条")
+
+        # 6. 删除无法在主表中匹配到的选课记录，保证参照完整性
+        if self.students_df is not None and 'student_id' in self.students_df.columns:
+            valid_student_ids = set(self.students_df['student_id'])
+            before_filter_students = len(df)
+            df = df[df['student_id'].isin(valid_student_ids)].copy()
+            removed_invalid_students = before_filter_students - len(df)
+            if removed_invalid_students > 0:
+                print(f"  - 删除引用不存在学生的选课记录: {removed_invalid_students}条")
+
+        if self.courses_df is not None and 'course_id' in self.courses_df.columns:
+            valid_course_ids = set(self.courses_df['course_id'])
+            before_filter_courses = len(df)
+            df = df[df['course_id'].isin(valid_course_ids)].copy()
+            removed_invalid_courses = before_filter_courses - len(df)
+            if removed_invalid_courses > 0:
+                print(f"  - 删除引用不存在课程的选课记录: {removed_invalid_courses}条")
 
         self.sc_df = df
         print(f"✓ 选课表清洗完成，当前记录数: {len(df)}")
@@ -366,6 +428,7 @@ class DataPreprocessor:
         report_lines.append("- 删除学号或姓名为空的记录")
         report_lines.append("- 字符串字段去除首尾空格")
         report_lines.append("- 性别字段统一为 M/F 格式")
+        report_lines.append("- 删除组号异常且存在有效重复项的学生记录")
         report_lines.append("- 组号和院系编号格式统一")
 
         report_lines.append("\n### 课程表")
@@ -373,6 +436,7 @@ class DataPreprocessor:
         report_lines.append("- 字符串字段去除首尾空格")
         report_lines.append("- 学分、课时字段转换为数值类型")
         report_lines.append("- 共享标志统一为 Y/N 格式")
+        report_lines.append("- 将与院系编号相同的 share_flag 归一为 N")
         report_lines.append("- 组号和院系编号格式统一")
 
         report_lines.append("\n### 选课表")
@@ -380,6 +444,7 @@ class DataPreprocessor:
         report_lines.append("- 字符串字段去除首尾空格")
         report_lines.append("- 成绩字段转换为数值类型（保留NULL）")
         report_lines.append("- 删除重复选课记录")
+        report_lines.append("- 删除引用不存在学生或课程的选课记录")
         report_lines.append("- 组号和院系编号格式统一")
 
         report_content = "\n".join(report_lines)
