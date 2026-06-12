@@ -34,14 +34,8 @@ CLEANED_DIR = os.path.join(DATA_DIR, 'cleaned')
 FIGURES_DIR = './figures'
 REPORT_PATH = './anomaly_report.md'
 
-# 中文字体适配：优先使用 Windows 常见中文字体
-for _font in ['Microsoft YaHei', 'SimHei', 'KaiTi', 'FangSong']:
-    try:
-        matplotlib.font_manager.findfont(_font, fallback_to_default=False)
-        matplotlib.rcParams['font.sans-serif'] = [_font, 'DejaVu Sans']
-        break
-    except Exception:
-        continue
+# Use English labels to avoid CJK font rendering issues
+matplotlib.rcParams['font.family'] = 'DejaVu Sans'
 matplotlib.rcParams['axes.unicode_minus'] = False
 sns.set_style("whitegrid")
 plt.rcParams['figure.dpi'] = 150
@@ -120,13 +114,13 @@ def analyze_missing_values(data, all_groups):
 
     # 构建覆盖矩阵
     coverage = pd.DataFrame(index=sorted(all_groups))
-    coverage['有学生表'] = coverage.index.isin(s_g)
-    coverage['有课程表'] = coverage.index.isin(c_g)
-    coverage['有选课表'] = coverage.index.isin(sc_g)
-    coverage['完整度'] = coverage.sum(axis=1)
+    coverage['Has Students'] = coverage.index.isin(s_g)
+    coverage['Has Courses'] = coverage.index.isin(c_g)
+    coverage['Has SC'] = coverage.index.isin(sc_g)
+    coverage['Completeness'] = coverage.sum(axis=1)
 
-    full_groups = coverage[coverage['完整度'] == 3].index.tolist()
-    partial_groups = coverage[coverage['完整度'] < 3].index.tolist()
+    full_groups = coverage[coverage['Completeness'] == 3].index.tolist()
+    partial_groups = coverage[coverage['Completeness'] < 3].index.tolist()
 
     print(f"\n  完整组 (三表齐全): {len(full_groups)} 个 — {full_groups}")
     print(f"  不完整组: {len(partial_groups)} 个")
@@ -145,7 +139,7 @@ def analyze_missing_values(data, all_groups):
             '类别': '缺失值-组级',
             '严重程度': '高',
             '描述': f'共 {len(partial_groups)} 个组数据不完整（缺少至少一张表）：{partial_groups}',
-            '详情': '; '.join([f"组{g}缺少{['学生表','课程表','选课表'][i]}" for g in partial_groups for i in range(3) if not coverage.iloc[all_groups.index(g), i]]),
+            '详情': '; '.join([f"组{g}缺少{['Students','Courses','SC'][i]}" for g in partial_groups for i in range(3) if not coverage.iloc[all_groups.index(g), i]]),
         })
 
     # --- 1b. 字段级缺失值 ---
@@ -836,16 +830,16 @@ def create_visualizations(data, coverage, sc_null_by_group, quant_df,
     # ---- 图1: 各组数据完整度热力图 ----
     fig, ax = plt.subplots(figsize=(14, 6))
     coverage_plot = coverage.copy()
-    coverage_plot.index.name = '组号'
+    coverage_plot.index.name = 'Group No.'
 
     # 用颜色表示完整度
-    mask = ~coverage_plot[['有学生表', '有课程表', '有选课表']]
-    hm_data = coverage_plot[['有学生表', '有课程表', '有选课表']].astype(int)
+    mask = ~coverage_plot[['Has Students', 'Has Courses', 'Has SC']]
+    hm_data = coverage_plot[['Has Students', 'Has Courses', 'Has SC']].astype(int)
     sns.heatmap(hm_data.T, annot=True, fmt='d', cmap='RdYlGn',
                 cbar=False, linewidths=0.5, linecolor='white',
                 xticklabels=1, yticklabels=1, ax=ax)
-    ax.set_title('各组数据表覆盖情况', fontsize=14, fontweight='bold')
-    ax.set_xlabel('组号')
+    ax.set_title('Data Table Coverage by Group', fontsize=14, fontweight='bold')
+    ax.set_xlabel('Group No.')
     plt.tight_layout()
     fig.savefig(os.path.join(FIGURES_DIR, 'fig1_data_coverage_heatmap.png'))
     plt.close(fig)
@@ -864,10 +858,10 @@ def create_visualizations(data, coverage, sc_null_by_group, quant_df,
                 else '#2ecc71' if row['group_no'] == OWN_GROUP else '#3498db'
                 for _, row in quant_full.iterrows()]
     axes[0].bar(quant_full['group_no'].astype(str), quant_full['student_count'], color=colors_s, alpha=0.85)
-    axes[0].axhline(y=EXPECTED_STUDENTS, color='gray', linestyle='--', alpha=0.7, label=f'预期({EXPECTED_STUDENTS})')
-    axes[0].set_title('各组学生数', fontsize=12, fontweight='bold')
-    axes[0].set_xlabel('组号')
-    axes[0].set_ylabel('学生数')
+    axes[0].axhline(y=EXPECTED_STUDENTS, color='gray', linestyle='--', alpha=0.7, label=f'Expected({EXPECTED_STUDENTS})')
+    axes[0].set_title('Student Count by Group', fontsize=12, fontweight='bold')
+    axes[0].set_xlabel('Group No.')
+    axes[0].set_ylabel('Student Count')
     axes[0].tick_params(axis='x', rotation=45)
     axes[0].legend(fontsize=8)
 
@@ -877,10 +871,10 @@ def create_visualizations(data, coverage, sc_null_by_group, quant_df,
                 else '#2ecc71' if row['group_no'] == OWN_GROUP else '#3498db'
                 for _, row in quant_full.iterrows()]
     axes[1].bar(quant_full['group_no'].astype(str), quant_full['course_count'], color=colors_c, alpha=0.85)
-    axes[1].axhline(y=EXPECTED_COURSES, color='gray', linestyle='--', alpha=0.7, label=f'预期({EXPECTED_COURSES})')
-    axes[1].set_title('各组课程数', fontsize=12, fontweight='bold')
-    axes[1].set_xlabel('组号')
-    axes[1].set_ylabel('课程数')
+    axes[1].axhline(y=EXPECTED_COURSES, color='gray', linestyle='--', alpha=0.7, label=f'Expected({EXPECTED_COURSES})')
+    axes[1].set_title('Course Count by Group', fontsize=12, fontweight='bold')
+    axes[1].set_xlabel('Group No.')
+    axes[1].set_ylabel('Course Count')
     axes[1].tick_params(axis='x', rotation=45)
     axes[1].legend(fontsize=8)
 
@@ -890,14 +884,14 @@ def create_visualizations(data, coverage, sc_null_by_group, quant_df,
                  else '#2ecc71' if row['group_no'] == OWN_GROUP else '#3498db'
                  for _, row in quant_full.iterrows()]
     axes[2].bar(quant_full['group_no'].astype(str), quant_full['sc_count'], color=colors_sc, alpha=0.85)
-    axes[2].axhline(y=EXPECTED_SC, color='gray', linestyle='--', alpha=0.7, label=f'预期({EXPECTED_SC})')
-    axes[2].set_title('各组选课数', fontsize=12, fontweight='bold')
-    axes[2].set_xlabel('组号')
-    axes[2].set_ylabel('选课记录数')
+    axes[2].axhline(y=EXPECTED_SC, color='gray', linestyle='--', alpha=0.7, label=f'Expected({EXPECTED_SC})')
+    axes[2].set_title('SC Count by Group', fontsize=12, fontweight='bold')
+    axes[2].set_xlabel('Group No.')
+    axes[2].set_ylabel('SC Record Count')
     axes[2].tick_params(axis='x', rotation=45)
     axes[2].legend(fontsize=8)
 
-    fig.suptitle('各组数据规模对比（红色=异常偏离，绿色=本组16）', fontsize=14, fontweight='bold')
+    fig.suptitle('Data Scale by Group (Red=Anomaly, Green=Own G16)', fontsize=14, fontweight='bold')
     plt.tight_layout()
     fig.savefig(os.path.join(FIGURES_DIR, 'fig2_quantity_distribution.png'))
     plt.close(fig)
@@ -911,9 +905,9 @@ def create_visualizations(data, coverage, sc_null_by_group, quant_df,
     bar_colors = ['#e74c3c' if r == 100 else '#f39c12' if r > 0 else '#2ecc71'
                   for r in merged['null_rate']]
     bars = ax.bar(merged['group_no'].astype(str), merged['null_rate'], color=bar_colors, alpha=0.85)
-    ax.set_title('各组选课成绩缺失率', fontsize=14, fontweight='bold')
-    ax.set_xlabel('组号')
-    ax.set_ylabel('成绩缺失率 (%)')
+    ax.set_title('Score Null Rate by Group', fontsize=14, fontweight='bold')
+    ax.set_xlabel('Group No.')
+    ax.set_ylabel('Score Null Rate (%)')
     ax.set_ylim(0, 110)
     ax.tick_params(axis='x', rotation=45)
 
@@ -926,9 +920,9 @@ def create_visualizations(data, coverage, sc_null_by_group, quant_df,
     # 图例
     from matplotlib.patches import Patch
     legend_elements = [
-        Patch(facecolor='#e74c3c', label='100% 缺失'),
-        Patch(facecolor='#f39c12', label='部分缺失'),
-        Patch(facecolor='#2ecc71', label='无缺失'),
+        Patch(facecolor='#e74c3c', label='100% Null'),
+        Patch(facecolor='#f39c12', label='Partial Null'),
+        Patch(facecolor='#2ecc71', label='No Null'),
     ]
     ax.legend(handles=legend_elements, loc='upper right', fontsize=9)
 
@@ -944,41 +938,41 @@ def create_visualizations(data, coverage, sc_null_by_group, quant_df,
     sid_len_data = {}
     for g in sorted(students['group_no'].unique()):
         g_df = students[students['group_no'] == g]
-        sid_len_data[f'组{g}'] = g_df['student_id'].astype(str).str.len().values
+        sid_len_data[f'G{g}'] = g_df['student_id'].astype(str).str.len().values
 
-    sid_box_data = [sid_len_data[k] for k in sorted(sid_len_data.keys(), key=lambda x: int(x.replace('组', '')))]
-    sid_labels = sorted(sid_len_data.keys(), key=lambda x: int(x.replace('组', '')))
+    sid_box_data = [sid_len_data[k] for k in sorted(sid_len_data.keys(), key=lambda x: int(x.replace('G', '')))]
+    sid_labels = sorted(sid_len_data.keys(), key=lambda x: int(x.replace('G', '')))
 
     bp1 = axes[0].boxplot(sid_box_data, labels=sid_labels, patch_artist=True,
                           showfliers=True, widths=0.6)
     for patch in bp1['boxes']:
         patch.set_facecolor('#3498db')
         patch.set_alpha(0.6)
-    axes[0].set_title('各组学号长度分布', fontsize=12, fontweight='bold')
-    axes[0].set_xlabel('组号')
-    axes[0].set_ylabel('学号长度（字符）')
+    axes[0].set_title('Student ID Length Distribution by Group', fontsize=12, fontweight='bold')
+    axes[0].set_xlabel('Group No.')
+    axes[0].set_ylabel('Student ID Length (chars)')
     axes[0].tick_params(axis='x', rotation=45)
 
     # 课程编号长度
     cid_len_data = {}
     for g in sorted(courses['group_no'].unique()):
         g_df = courses[courses['group_no'] == g]
-        cid_len_data[f'组{g}'] = g_df['course_id'].astype(str).str.len().values
+        cid_len_data[f'G{g}'] = g_df['course_id'].astype(str).str.len().values
 
-    cid_box_data = [cid_len_data[k] for k in sorted(cid_len_data.keys(), key=lambda x: int(x.replace('组', '')))]
-    cid_labels = sorted(cid_len_data.keys(), key=lambda x: int(x.replace('组', '')))
+    cid_box_data = [cid_len_data[k] for k in sorted(cid_len_data.keys(), key=lambda x: int(x.replace('G', '')))]
+    cid_labels = sorted(cid_len_data.keys(), key=lambda x: int(x.replace('G', '')))
 
     bp2 = axes[1].boxplot(cid_box_data, labels=cid_labels, patch_artist=True,
                           showfliers=True, widths=0.6)
     for patch in bp2['boxes']:
         patch.set_facecolor('#e67e22')
         patch.set_alpha(0.6)
-    axes[1].set_title('各组课程编号长度分布', fontsize=12, fontweight='bold')
-    axes[1].set_xlabel('组号')
-    axes[1].set_ylabel('课程编号长度（字符）')
+    axes[1].set_title('Course ID Length Distribution by Group', fontsize=12, fontweight='bold')
+    axes[1].set_xlabel('Group No.')
+    axes[1].set_ylabel('Course ID Length (chars)')
     axes[1].tick_params(axis='x', rotation=45)
 
-    fig.suptitle('各组学号/课程编号格式差异分析', fontsize=14, fontweight='bold')
+    fig.suptitle('ID Format Difference Analysis by Group', fontsize=14, fontweight='bold')
     plt.tight_layout()
     fig.savefig(os.path.join(FIGURES_DIR, 'fig4_id_format_boxplot.png'))
     plt.close(fig)
@@ -998,20 +992,20 @@ def create_visualizations(data, coverage, sc_null_by_group, quant_df,
     sc_null_rate_series = sc.groupby('group_no')['score'].apply(lambda x: x.isnull().mean() * 100)
 
     missing_matrix = pd.DataFrame(index=sorted(all_groups))
-    missing_matrix['account缺失%'] = students.groupby('group_no')['account'].apply(
+    missing_matrix['account Null%'] = students.groupby('group_no')['account'].apply(
         lambda x: x.isnull().mean() * 100
     ).reindex(sorted(all_groups)).fillna(100)  # 无数据的组视为100%缺失
-    missing_matrix['password缺失%'] = students.groupby('group_no')['password'].apply(
+    missing_matrix['password Null%'] = students.groupby('group_no')['password'].apply(
         lambda x: x.isnull().mean() * 100
     ).reindex(sorted(all_groups)).fillna(100)
-    missing_matrix['成绩缺失%'] = sc_null_rate_series.reindex(sorted(all_groups)).fillna(100)
+    missing_matrix['score Null%'] = sc_null_rate_series.reindex(sorted(all_groups)).fillna(100)
 
     sns.heatmap(missing_matrix, annot=True, fmt='.0f', cmap='YlOrRd',
                 linewidths=0.5, linecolor='white', ax=ax,
-                vmin=0, vmax=100, cbar_kws={'label': '缺失率 (%)'})
-    ax.set_title('各组关键字段缺失率热力图', fontsize=14, fontweight='bold')
-    ax.set_ylabel('组号')
-    ax.set_xlabel('字段')
+                vmin=0, vmax=100, cbar_kws={'label': 'Null Rate (%)'})
+    ax.set_title('Key Field Null Rate Heatmap by Group', fontsize=14, fontweight='bold')
+    ax.set_ylabel('Group No.')
+    ax.set_xlabel('Field')
 
     plt.tight_layout()
     fig.savefig(os.path.join(FIGURES_DIR, 'fig5_missing_value_heatmap.png'))
@@ -1023,35 +1017,35 @@ def create_visualizations(data, coverage, sc_null_by_group, quant_df,
 
     # 计算各组异常评分
     anomaly_scores = pd.DataFrame(index=sorted(all_groups))
-    anomaly_scores['数据不完整'] = anomaly_scores.index.map(
+    anomaly_scores['Incomplete'] = anomaly_scores.index.map(
         lambda g: 0 if g in set(students['group_no'].unique()) & set(courses['group_no'].unique()) & set(sc['group_no'].unique()) else 1
     )
-    anomaly_scores['数量异常'] = anomaly_scores.index.map(
+    anomaly_scores['Qty Anomaly'] = anomaly_scores.index.map(
         lambda g: 1 if (g in set(students['group_no'].unique()) and
                         abs(len(students[students['group_no'] == g]) - EXPECTED_STUDENTS) > EXPECTED_STUDENTS * 0.2)
                        or (g in set(courses['group_no'].unique()) and
                            abs(len(courses[courses['group_no'] == g]) - EXPECTED_COURSES) > EXPECTED_COURSES * 0.2)
                   else 0
     )
-    anomaly_scores['成绩全NULL'] = anomaly_scores.index.map(
+    anomaly_scores['Score All Null'] = anomaly_scores.index.map(
         lambda g: 1 if g in _full_null_groups else 0
     )
-    anomaly_scores['成绩部分NULL'] = anomaly_scores.index.map(
+    anomaly_scores['Score Partial Null'] = anomaly_scores.index.map(
         lambda g: 1 if (g in _partial_null_groups) else 0
     )
 
-    anomaly_scores['总分'] = anomaly_scores.sum(axis=1)
+    anomaly_scores['Total Score'] = anomaly_scores.sum(axis=1)
     # 本组高亮
     colors_total = ['#2ecc71' if g == OWN_GROUP else '#e74c3c' if s >= 3 else '#f39c12' if s >= 1 else '#3498db'
-                    for g, s in zip(anomaly_scores.index, anomaly_scores['总分'])]
-    ax.bar(anomaly_scores.index.astype(str), anomaly_scores['总分'], color=colors_total, alpha=0.85)
-    ax.set_title('各组异常程度总览（分数越高越异常）', fontsize=14, fontweight='bold')
-    ax.set_xlabel('组号')
-    ax.set_ylabel('异常评分')
+                    for g, s in zip(anomaly_scores.index, anomaly_scores['Total Score'])]
+    ax.bar(anomaly_scores.index.astype(str), anomaly_scores['Total Score'], color=colors_total, alpha=0.85)
+    ax.set_title('Anomaly Score Overview by Group', fontsize=14, fontweight='bold')
+    ax.set_xlabel('Group No.')
+    ax.set_ylabel('Anomaly Score')
     ax.tick_params(axis='x', rotation=45)
 
     # 标注
-    for i, (g, score) in enumerate(zip(anomaly_scores.index, anomaly_scores['总分'])):
+    for i, (g, score) in enumerate(zip(anomaly_scores.index, anomaly_scores['Total Score'])):
         if score > 0:
             ax.text(i, score + 0.1, str(int(score)), ha='center', fontsize=8)
 
